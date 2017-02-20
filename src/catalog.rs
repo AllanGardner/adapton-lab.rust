@@ -441,7 +441,19 @@ pub mod hammer_s17_hw0 {
     (inp: List<X>, f:Rc<F>) -> List<X> 
     where F:Fn(X) -> bool
   {
-    panic!("TODO")
+	let filt_clos = |x,nm,xs| {
+			let (nm1, nm2) = name_fork(nm);
+			let y = f(x);
+			let rest = list_filter(force(&xs), f);
+			if y { List::Cons(x, nm1, cell(nm2, rest)) }
+			else { rest }
+		};
+	match inp {
+      List::Nil => List::Nil,
+      List::Cons(x, nm, xs) => {
+        memo!(nm.clone() =>> filt_clos, x:x, nm:nm, xs:xs)
+      }
+    }
   }
 
   /// List split:
