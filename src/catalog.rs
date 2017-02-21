@@ -439,19 +439,24 @@ pub mod hammer_s17_hw0 {
   pub fn list_filter<X:Eq+Clone+Hash+Debug+'static,
                      F:'static>
     (inp: List<X>, f:Rc<F>) -> List<X> 
-    where F:Fn(X) -> bool
+    where F:Fn(&X) -> bool
   {
-	let filt_clos = |x,nm,xs| {
-			let (nm1, nm2) = name_fork(nm);
-			let y = f(x);
-			let rest = list_filter(force(&xs), f);
-			if y { List::Cons(x, nm1, cell(nm2, rest)) }
-			else { rest }
-		};
-	match inp {
+    match inp {
       List::Nil => List::Nil,
       List::Cons(x, nm, xs) => {
-        memo!(nm.clone() =>> filt_clos, x:x, nm:nm, xs:xs)
+        let t = thunk
+          (ArtIdChoice::Nominal(nm.clone()),
+           prog_pt!("filt_clos"),
+           Rc::new(Box::new(
+             |(x,nm,xs), f:Rc<F>|{
+                let (nm1, nm2) = name_fork(nm);
+                let y = f(&x);
+                let rest = list_filter(force(&xs), f);
+                if y { List::Cons(x, nm1, cell(nm2, rest)) }
+                else { rest }
+             })),
+           ( x,nm,xs ),f);
+        force(&t)
       }
     }
   }
@@ -460,29 +465,64 @@ pub mod hammer_s17_hw0 {
   pub fn list_split<X:Eq+Clone+Hash+Debug+'static,
                     F:'static>
     (inp: List<X>, f:Rc<F>) -> (List<X>, List<X>)
-    where F:Fn(X) -> bool
+    where F:Fn(&X) -> bool
   {
-    panic!("TODO")
+    match inp {
+      List::Nil => (List::Nil,List::Nil),
+      List::Cons(x, nm, xs) => {
+        let t = thunk
+          (ArtIdChoice::Nominal(nm.clone()),
+           prog_pt!("split_clos"),
+           Rc::new(Box::new(
+             |(x,nm,xs), f:Rc<F>|{
+                let (nm1, nm2) = name_fork(nm);
+                let y = f(&x);
+                let (r1,r2) = list_split(force(&xs), f);
+                if y { ( List::Cons(x, nm1, cell(nm2, r1)), r2) }
+                else { ( r1, List::Cons(x, nm1, cell(nm2, r2))) }
+             })),
+           ( x,nm,xs ),f);
+        force(&t)
+      }
+    }
   }
 
   /// List reverse:
   pub fn list_reverse<X:Eq+Clone+Hash+Debug+'static>
     (inp: List<X>) -> List<X>
   {
-    panic!("TODO")
+	fn rev<X:Eq+Clone+Hash+Debug+'static>
+		(inp: List<X>,a:List<X>) -> List<X> {
+		match inp {
+		  List::Nil => a,
+		  List::Cons(x, nm, xs) => {
+			let t = thunk
+			  (ArtIdChoice::Nominal(nm.clone()),
+			   prog_pt!("rev_clos"),
+			   Rc::new(Box::new(
+				 |(x,nm,xs,a), _|{
+					let (nm1, nm2) = name_fork(nm);
+					rev(force(&xs), List::Cons(x, nm1, cell(nm2, a)))
+				 })),
+			   ( x,nm,xs,a),());
+			force(&t)
+		  }
+		}
+	}
+	rev(inp,List::Nil)
   }
 
 
   #[derive(Clone,Debug)]
   pub struct RunFilter { } 
   impl Compute<List<usize>, List<usize>> for RunFilter {
-    fn compute(inp:List<usize>) -> List<usize> { list_filter(inp, Rc::new(|x| x % 2 == 0)) }
+    fn compute(inp:List<usize>) -> List<usize> { list_filter(inp, Rc::new(|x:&usize| (*x) % 2 == 0)) }
   }
 
   #[derive(Clone,Debug)]
   pub struct RunSplit { } 
   impl Compute<List<usize>, (List<usize>, List<usize>)> for RunSplit {
-    fn compute(inp:List<usize>) -> (List<usize>,List<usize>) { list_split(inp, Rc::new(|x| x % 2 == 0)) }
+    fn compute(inp:List<usize>) -> (List<usize>,List<usize>) { list_split(inp, Rc::new(|x:&usize| (*x) % 2 == 0)) }
   }
 
   #[derive(Clone,Debug)]
