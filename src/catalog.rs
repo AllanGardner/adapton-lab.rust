@@ -633,7 +633,29 @@ pub mod hammer_s17_hw1 {
     (inp: List<X>, f:Rc<F>) -> List<X> 
     where F:Fn(X) -> bool
   {
-    panic!("TODO")
+    match inp {
+      List::Nil => List::Nil,
+      List::Cons(x, xs) => {
+        let y = f(x.clone());
+        let rest = list_filter(*xs, f);
+		if y { List::Cons(x, Box::new(rest)) }
+		else { rest }
+      },
+      List::Art(art) => {
+        let xs = force(&art);
+		list_filter (xs,f)
+      },
+      List::Name(nm, xs) => {
+        List::Art(thunk
+          (ArtIdChoice::Nominal(nm.clone()),
+           prog_pt!("filt_clos"),
+           Rc::new(Box::new(
+             |(nm,xs):(Name,Box<List<X>>), f:Rc<F>|{
+                List::Art(cell(nm.clone(), list_filter(*xs, f)))
+             })),
+           ( nm,xs ),f))
+      }
+    }
   }
 
   /// List split:
