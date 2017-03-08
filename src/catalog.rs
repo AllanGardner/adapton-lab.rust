@@ -664,28 +664,147 @@ pub mod hammer_s17_hw1 {
     (inp: List<X>, f:Rc<F>) -> (List<X>, List<X>)
     where F:Fn(X) -> bool
   {
-    panic!("TODO")
+    match inp {
+      List::Nil => (List::Nil,List::Nil),
+      List::Cons(x, xs) => {
+        let y = f(x.clone());
+        let (r1,r2) = list_split(*xs, f);
+		if y { (List::Cons(x, Box::new(r1)),r2) }
+		else { (r1,List::Cons(x, Box::new(r2))) }
+      },
+      List::Art(art) => {
+        let xs = force(&art);
+		list_split (xs,f)
+      },
+      List::Name(nm, xs) => {
+		let (nm1, nm2) = name_fork(nm.clone());
+		let rth = Rc::new(thunk
+          (ArtIdChoice::Nominal(nm.clone()),
+           prog_pt!("splt_clos"),
+           Rc::new(Box::new(
+             |(nm,xs):(Name,Box<List<X>>), f:Rc<F>|{
+                list_split(*xs, f)
+             })),
+           ( nm.clone(),xs.clone() ),f.clone()));
+		let rth2 = rth.clone();
+	    (List::Art(thunk
+          (ArtIdChoice::Nominal(nm1),
+           prog_pt!("splt_clos_1"),
+           Rc::new(Box::new(
+             move |(nm,xs):(Name,Box<List<X>>), f:Rc<F>|{
+				let (r,_) = force(&rth);
+				r
+             })),
+           ( nm.clone(),xs.clone() ),f.clone()))
+	    ,List::Art(thunk
+          (ArtIdChoice::Nominal(nm2),
+           prog_pt!("splt_clos_2"),
+           Rc::new(Box::new(
+             move |(nm,xs):(Name,Box<List<X>>), f:Rc<F>|{
+				let (_,r) = force(&rth2);
+				r
+             })),
+           ( nm.clone(),xs.clone() ),f.clone()))
+	    )
+      }
+    }
   }
 
   /// List reverse:
   pub fn list_reverse<X:Eq+Clone+Hash+Debug+'static>
     (inp: List<X>) -> List<X>
   {
-    panic!("TODO")
+	fn rev<X:Eq+Clone+Hash+Debug+'static>
+		(inp: List<X>,a:List<X>) -> List<X> {
+		match inp {
+		  List::Nil => a,
+		  List::Cons(x, xs) => rev(*xs, List::Cons(x, Box::new(a))),
+		  List::Art(art) => {
+			let xs = force(&art);
+			rev(xs,a)
+		  },
+		  List::Name(nm, xs) => {
+			List::Art(thunk
+			  (ArtIdChoice::Nominal(nm.clone()),
+			   prog_pt!("rev_clos"),
+			   Rc::new(Box::new(
+				 |(nm,xs,a):(Name,List<X>,List<X>), ()|{
+					List::Art(cell(nm.clone(), rev(xs, a)))
+				 })),
+			   ( nm,*xs,a ),()))
+		  }
+		}
+	}
+	rev(inp,List::Nil)
   }
 
   /// List join:
   pub fn list_join<X:Eq+Clone+Hash+Debug+'static>
     (inp: List<List<X>>) -> List<X>
   {
-    panic!("TODO")
+	fn append<X:Eq+Clone+Hash+Debug+'static>
+		(inp: List<X>,a:List<X>) -> List<X> {
+		match inp {
+		  List::Nil => a,
+		  List::Cons(x, xs) => List::Cons(x, Box::new(append(*xs, a))),
+		  List::Art(art) => {
+			let xs = force(&art);
+			append(xs,a)
+		  },
+		  List::Name(nm, xs) => {
+			List::Art(thunk
+			  (ArtIdChoice::Nominal(nm.clone()),
+			   prog_pt!("app_clos"),
+			   Rc::new(Box::new(
+				 |(nm,xs,a):(Name,List<X>,List<X>), ()|{
+					List::Art(cell(nm.clone(), append(xs, a)))
+				 })),
+			   ( nm,*xs,a ),()))
+		  }
+		}
+	}
+	match inp {
+	  List::Nil => List::Nil,
+	  List::Cons(x, xs) => append(x, list_join(*xs)),
+	  List::Art(art) => {
+		let xs = force(&art);
+		list_join(xs)
+	  },
+	  List::Name(nm, xs) => {
+		List::Art(thunk
+		  (ArtIdChoice::Nominal(nm.clone()),
+		   prog_pt!("join_clos"),
+		   Rc::new(Box::new(
+			 |(nm,xs):(Name,List<List<X>>), ()|{
+				List::Art(cell(nm.clone(), list_join(xs)))
+			 })),
+		   ( nm,*xs ),()))
+	  }
+	}
   }
 
   /// List singletons:
   pub fn list_singletons<X:Eq+Clone+Hash+Debug+'static>
     (inp: List<X>) -> List<List<X>>
   {
-    panic!("TODO")
+	match inp {
+	  List::Nil => List::Nil,
+	  List::Cons(x, xs) => List::Cons(List::Cons(x,Box::new(List::Nil)), Box::new(list_singletons(*xs))),
+	  List::Art(art) => {
+		let xs = force(&art);
+		list_singletons(xs)
+	  },
+	  List::Name(nm, xs) => {
+		List::Art(thunk
+		  (ArtIdChoice::Nominal(nm.clone()),
+		   prog_pt!("join_clos"),
+		   Rc::new(Box::new(
+			 |(nm,xs):(Name,List<X>), ()|{
+				List::Art(cell(nm.clone(), list_singletons(xs)))
+			 })),
+		   ( nm,*xs ),()))
+	  }
+	}
   }
 
 
